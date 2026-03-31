@@ -29,6 +29,8 @@ spec:
               value: "http://ingredients.woodpantry.svc.cluster.local"
             - name: RECIPE_URL
               value: "http://recipes.woodpantry.svc.cluster.local"
+            - name: PANTRY_URL
+              value: "http://pantry.woodpantry.svc.cluster.local"
             - name: RABBITMQ_URL
               valueFrom:
                 secretKeyRef:

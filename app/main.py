@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from app.config import settings
 from app.events.publisher import init_publisher
 from app.events.subscriber import start_consumer
+from app.workers.pantry_ingest import handle_pantry_ingest_requested
 from app.workers.recipe_ingest import handle_recipe_import_requested
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,18 @@ async def lifespan(app: FastAPI):
             routing_key="recipe.import.requested",
             handler=handle_recipe_import_requested,
         )
+
+        if settings.pantry_url:
+            await start_consumer(
+                channel=channel,
+                queue_name="ingestion.pantry-ingest-requested",
+                routing_key="pantry.ingest.requested",
+                handler=handle_pantry_ingest_requested,
+            )
+        else:
+            logger.warning(
+                "PANTRY_URL not set — pantry ingest consumer not started"
+            )
 
         logger.info("RabbitMQ consumers started")
     except Exception:
