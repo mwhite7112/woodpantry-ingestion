@@ -164,7 +164,6 @@ woodpantry-ingestion/
 
 ## Outstanding Work
 
-- **Pantry ingest worker** (`pantry.ingest.requested` consumer) — blocked on W-2 adding `POST /pantry/ingest/:job_id/stage` endpoint to the Pantry Service. The worker stub is at `app/workers/pantry_ingest.py`.
 - **Twilio webhook handler** — W-5 scope. Stub at `app/api/twilio.py`.
 - **Receipt photo/OCR flow** — Phase 3.
 - **Tests** — unit and integration tests to be added.

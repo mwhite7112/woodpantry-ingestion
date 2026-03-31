@@ -21,7 +21,7 @@ All other processing is queue-driven.
 |-------|-----------|-------------|
 | `recipe.import.requested` | Subscribes | Triggers recipe extraction worker |
 | `recipe.imported` | Publishes | Structured recipe payload after extraction |
-| `pantry.ingest.requested` | Subscribes (TODO) | Triggers pantry extraction worker (blocked on W-2) |
+| `pantry.ingest.requested` | Subscribes | Triggers pantry extraction worker |
 
 ## Tech Stack
 
@@ -44,7 +44,7 @@ All other processing is queue-driven.
 | `RABBITMQ_URL` | required | RabbitMQ connection string |
 | `DICTIONARY_URL` | `http://woodpantry-ingredients:8080` | Ingredient Dictionary base URL |
 | `RECIPE_URL` | `http://woodpantry-recipes:8080` | Recipe Service base URL |
-| `PANTRY_URL` | optional | Pantry Service base URL (W-2 not complete) |
+| `PANTRY_URL` | optional | Pantry Service base URL (required for pantry ingest consumer) |
 | `OPENAI_API_KEY` | required | OpenAI API key (extraction + vision) |
 | `EXTRACT_MODEL` | `gpt-5-mini` | OpenAI model for text extraction |
 | `VISION_MODEL` | `gpt-5` | OpenAI model for receipt OCR / vision (Phase 3) |
@@ -71,7 +71,6 @@ uv run pytest
 
 ## Outstanding Work
 
-- **Pantry ingest worker** (`pantry.ingest.requested` consumer) — blocked on W-2 adding `POST /pantry/ingest/:job_id/stage` endpoint to the Pantry Service
 - **Twilio webhook handler** — W-5 scope
 - **Receipt photo/OCR flow** — Phase 3
 - **Tests** — unit and integration tests to be added
