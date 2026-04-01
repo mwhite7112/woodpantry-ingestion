@@ -45,9 +45,7 @@ async def lifespan(app: FastAPI):
                 handler=handle_pantry_ingest_requested,
             )
         else:
-            logger.warning(
-                "PANTRY_URL not set — pantry ingest consumer not started"
-            )
+            logger.warning("PANTRY_URL not set — pantry ingest consumer not started")
 
         logger.info("RabbitMQ consumers started")
     except Exception:
