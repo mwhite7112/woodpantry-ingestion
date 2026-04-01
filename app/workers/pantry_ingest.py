@@ -14,6 +14,7 @@ import aio_pika
 
 from app.clients.dictionary import resolve
 from app.clients.pantry import stage_items
+from app.events.publisher import publish_pantry_ingest_failed
 from app.llm.openai import extract_pantry
 
 logger = logging.getLogger(__name__)
@@ -70,3 +71,7 @@ async def handle_pantry_ingest_requested(
 
         except Exception:
             logger.exception("Pantry ingest failed for job %s", job_id)
+            await publish_pantry_ingest_failed(
+                job_id=job_id,
+                error=f"Pantry ingest failed for job {job_id}",
+            )

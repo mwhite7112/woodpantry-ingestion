@@ -48,6 +48,20 @@ async def publish_recipe_import_failed(
     logger.warning("Published recipe.imported (failed) for job %s: %s", job_id, error)
 
 
+async def publish_pantry_ingest_failed(
+    job_id: str,
+    error: str,
+) -> None:
+    """Publish a pantry.ingest.failed event."""
+    body = {
+        "job_id": job_id,
+        "status": "failed",
+        "error": error,
+    }
+    await _publish("pantry.ingest.failed", body)
+    logger.warning("Published pantry.ingest.failed for job %s: %s", job_id, error)
+
+
 async def _publish(routing_key: str, body: dict) -> None:
     if _exchange is None:
         raise RuntimeError("Publisher not initialized — call init_publisher first")

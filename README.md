@@ -22,6 +22,7 @@ All other processing is queue-driven.
 | `recipe.import.requested` | Subscribes | Triggers recipe extraction worker |
 | `recipe.imported` | Publishes | Structured recipe payload after extraction |
 | `pantry.ingest.requested` | Subscribes | Triggers pantry extraction worker |
+| `pantry.ingest.failed` | Publishes | Failure payload when pantry extraction or staging fails |
 
 ## Tech Stack
 
