@@ -33,7 +33,7 @@ This service intentionally has no UI and no "clean" data — it is a pure I/O pr
 - **Calls**: Ingredient Dictionary (`/ingredients/resolve`), Pantry Service (POST staged items), Recipe Service (status updates)
 - **Called by**: Twilio (inbound webhook), RabbitMQ events
 - **Subscribes to**: `pantry.ingest.requested`, `recipe.import.requested`
-- **Publishes**: `recipe.imported`
+- **Publishes**: `recipe.imported`, `pantry.ingest.failed`
 
 ## API Endpoints
 

@@ -79,10 +79,11 @@ class TestRecipeImportWorker:
 
 
 class TestPantryIngestWorker:
+    @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.stage_items", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.resolve", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.extract_pantry", new_callable=AsyncMock)
-    async def test_success(self, mock_extract, mock_resolve, mock_stage):
+    async def test_success(self, mock_extract, mock_resolve, mock_stage, mock_publish_fail):
         mock_extract.return_value = ExtractionResponse(
             items=[
                 ExtractedItem(
@@ -108,11 +109,15 @@ class TestPantryIngestWorker:
         mock_extract.assert_awaited_once_with("2 lbs chicken")
         mock_resolve.assert_awaited_once_with("chicken")
         mock_stage.assert_awaited_once()
+        mock_publish_fail.assert_not_awaited()
 
+    @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.stage_items", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.resolve", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.extract_pantry", new_callable=AsyncMock)
-    async def test_resolve_failure_continues(self, mock_extract, mock_resolve, mock_stage):
+    async def test_resolve_failure_continues(
+        self, mock_extract, mock_resolve, mock_stage, mock_publish_fail
+    ):
         """If dictionary resolve fails for one item, it should continue with None."""
         mock_extract.return_value = ExtractionResponse(
             items=[
@@ -138,11 +143,15 @@ class TestPantryIngestWorker:
         mock_stage.assert_awaited_once()
         call_args = mock_stage.call_args
         assert call_args.kwargs["resolved_ids"] == {0: None}
+        mock_publish_fail.assert_not_awaited()
 
+    @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.stage_items", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.resolve", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.extract_pantry", new_callable=AsyncMock)
-    async def test_extraction_failure_does_not_crash(self, mock_extract, mock_resolve, mock_stage):
+    async def test_extraction_failure_publishes_failed(
+        self, mock_extract, mock_resolve, mock_stage, mock_publish_fail
+    ):
         mock_extract.side_effect = ValueError("LLM error")
 
         msg = _make_message({"job_id": "job-p3", "raw_text": "garbage"})
@@ -154,3 +163,59 @@ class TestPantryIngestWorker:
 
         mock_resolve.assert_not_awaited()
         mock_stage.assert_not_awaited()
+        mock_publish_fail.assert_awaited_once()
+        assert mock_publish_fail.call_args.kwargs["job_id"] == "job-p3"
+
+    @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.stage_items", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.resolve", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.extract_pantry", new_callable=AsyncMock)
+    async def test_staging_failure_publishes_failed(
+        self, mock_extract, mock_resolve, mock_stage, mock_publish_fail
+    ):
+        mock_extract.return_value = ExtractionResponse(
+            items=[
+                ExtractedItem(
+                    raw_text="2 lbs chicken",
+                    name="chicken",
+                    quantity=2.0,
+                    unit="lbs",
+                    confidence=0.95,
+                ),
+            ]
+        )
+        mock_resolve.return_value = ResolveResult(
+            ingredient_id="uuid-chicken", confidence=0.95, created=False
+        )
+        mock_stage.side_effect = RuntimeError("Pantry stage failed")
+
+        msg = _make_message({"job_id": "job-p4", "raw_text": "2 lbs chicken"})
+
+        from app.workers.pantry_ingest import handle_pantry_ingest_requested
+
+        await handle_pantry_ingest_requested(msg)
+
+        mock_extract.assert_awaited_once_with("2 lbs chicken")
+        mock_resolve.assert_awaited_once_with("chicken")
+        mock_stage.assert_awaited_once()
+        mock_publish_fail.assert_awaited_once()
+        assert mock_publish_fail.call_args.kwargs["job_id"] == "job-p4"
+
+    @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.stage_items", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.resolve", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.extract_pantry", new_callable=AsyncMock)
+    async def test_missing_raw_text_publishes_failed(
+        self, mock_extract, mock_resolve, mock_stage, mock_publish_fail
+    ):
+        msg = _make_message({"job_id": "job-p5"})
+
+        from app.workers.pantry_ingest import handle_pantry_ingest_requested
+
+        await handle_pantry_ingest_requested(msg)
+
+        mock_extract.assert_not_awaited()
+        mock_resolve.assert_not_awaited()
+        mock_stage.assert_not_awaited()
+        mock_publish_fail.assert_awaited_once()
+        assert mock_publish_fail.call_args.kwargs["job_id"] == "job-p5"
