@@ -72,6 +72,23 @@ class TestPublisher:
         assert body["error"] == "stage error"
         assert call_args.kwargs["routing_key"] == "pantry.ingest.failed"
 
+    async def test_publish_pantry_ingest_requested(self):
+        mock_exchange = AsyncMock()
+        publisher._exchange = mock_exchange
+
+        await publisher.publish_pantry_ingest_requested(
+            "job-pantry-1",
+            "milk, eggs",
+            "+15551234567",
+        )
+
+        call_args = mock_exchange.publish.call_args
+        body = json.loads(call_args.args[0].body)
+        assert body["job_id"] == "job-pantry-1"
+        assert body["raw_text"] == "milk, eggs"
+        assert body["from_number"] == "+15551234567"
+        assert call_args.kwargs["routing_key"] == "pantry.ingest.requested"
+
     async def test_publish_without_init_raises(self):
         with pytest.raises(RuntimeError, match="not initialized"):
             await publisher._publish("some.key", {"data": "test"})

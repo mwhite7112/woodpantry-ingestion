@@ -80,10 +80,18 @@ class TestRecipeImportWorker:
 
 class TestPantryIngestWorker:
     @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)
+    @patch("app.workers.pantry_ingest.send_outbound_sms", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.stage_items", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.resolve", new_callable=AsyncMock)
     @patch("app.workers.pantry_ingest.extract_pantry", new_callable=AsyncMock)
-    async def test_success(self, mock_extract, mock_resolve, mock_stage, mock_publish_fail):
+    async def test_success(
+        self,
+        mock_extract,
+        mock_resolve,
+        mock_stage,
+        mock_send_sms,
+        mock_publish_fail,
+    ):
         mock_extract.return_value = ExtractionResponse(
             items=[
                 ExtractedItem(
@@ -100,15 +108,24 @@ class TestPantryIngestWorker:
         )
         mock_stage.return_value = StageResult(staged_count=1, needs_review_count=0)
 
-        msg = _make_message({"job_id": "job-p1", "raw_text": "2 lbs chicken"})
+        msg = _make_message(
+            {
+                "job_id": "job-p1",
+                "raw_text": "2 lbs chicken",
+                "from_number": "+15551234567",
+            }
+        )
 
         from app.workers.pantry_ingest import handle_pantry_ingest_requested
 
-        await handle_pantry_ingest_requested(msg)
+        with patch("app.workers.pantry_ingest.job_registry") as mock_registry:
+            await handle_pantry_ingest_requested(msg)
 
         mock_extract.assert_awaited_once_with("2 lbs chicken")
         mock_resolve.assert_awaited_once_with("chicken")
         mock_stage.assert_awaited_once()
+        mock_registry.mark_ready.assert_called_once_with("job-p1")
+        mock_send_sms.assert_awaited_once()
         mock_publish_fail.assert_not_awaited()
 
     @patch("app.workers.pantry_ingest.publish_pantry_ingest_failed", new_callable=AsyncMock)

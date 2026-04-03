@@ -53,7 +53,6 @@ POST /twilio/inbound (from Twilio)
   → Validate Twilio signature (use twilio.request_validator)
   → Parse From number + Body text
   → Publish pantry.ingest.requested { raw_text, from_number, job_id }
-  → Reply SMS: "Processing your list..."
   (async) Ingestion worker consumes event:
     → LLM extraction → resolve ingredients → POST staged items to Pantry Service
     → Reply SMS: "N items staged. M need review. Reply CONFIRM to commit."
@@ -75,7 +74,7 @@ POST /twilio/inbound with MediaUrl0 present
 
 ### Phone-to-Job Mapping
 
-Map `From` phone number → most recent in-progress job ID so CONFIRM replies work. Use a simple in-memory dict with a TTL (e.g. 30 minutes). Sufficient for a single-user homelab — no persistence needed across restarts.
+Map `From` phone number → the most recent ready-to-confirm job ID so CONFIRM replies work. Track jobs in memory with a TTL (e.g. 30 minutes), and only mark them confirmable after staging finishes so an early CONFIRM does not target an unstaged job. Sufficient for a single-user homelab — no persistence needed across restarts.
 
 ```python
 # app/workers/job_registry.py
@@ -88,7 +87,7 @@ jobs: dict[str, tuple[str, float]] = {}  # phone → (job_id, expires_at)
 1. LLM extraction: call OpenAI API (gpt-5-mini) with structured extraction prompt
 2. For each extracted item: POST /ingredients/resolve → get ingredient_id
 3. POST staged items to Pantry Service
-4. Send confirmation SMS via Twilio API
+4. Mark the job ready for CONFIRM and send confirmation SMS via Twilio API
 5. On failure: mark job as failed, send error SMS
 ```
 
@@ -125,9 +124,9 @@ Both run on the same asyncio event loop. Use `asyncio.gather` or `anyio` task gr
 | `OPENAI_API_KEY` | required | OpenAI API key (extraction + vision) |
 | `EXTRACT_MODEL` | `gpt-5-mini` | OpenAI model for text extraction |
 | `VISION_MODEL` | `gpt-5` | OpenAI model for receipt OCR / vision (Phase 3) |
-| `TWILIO_ACCOUNT_SID` | required | Twilio account SID |
-| `TWILIO_AUTH_TOKEN` | required | Twilio auth token (also used to validate webhook signatures) |
-| `TWILIO_FROM_NUMBER` | required | Twilio phone number for outbound SMS |
+| `TWILIO_ACCOUNT_SID` | required for outbound SMS | Twilio account SID |
+| `TWILIO_AUTH_TOKEN` | required for Twilio webhook validation and outbound SMS | Twilio auth token (also used to validate webhook signatures) |
+| `TWILIO_FROM_NUMBER` | required for outbound SMS | Twilio phone number for outbound SMS |
 | `LOG_LEVEL` | `info` | Log level |
 
 ## Directory Layout
@@ -139,7 +138,7 @@ woodpantry-ingestion/
 │   ├── api/
 │   │   └── twilio.py              ← webhook handler + signature validation
 │   ├── workers/
-│   │   ├── pantry_ingest.py       ← pantry extraction consumer
+│   │   ├── pantry_ingest.py       ← pantry extraction consumer + staged SMS reply
 │   │   ├── recipe_ingest.py       ← recipe extraction consumer
 │   │   ├── sms.py                 ← Twilio reply + CONFIRM flow
 │   │   └── job_registry.py        ← in-memory phone → job_id map
@@ -147,7 +146,7 @@ woodpantry-ingestion/
 │   │   └── openai.py              ← OpenAI client (extraction + vision)
 │   ├── clients/
 │   │   ├── dictionary.py          ← httpx client for Ingredient Dictionary
-│   │   ├── pantry.py              ← httpx client for Pantry Service
+│   │   ├── pantry.py              ← httpx client for Pantry Service stage + confirm
 │   │   └── recipes.py             ← httpx client for Recipe Service
 │   ├── events/
 │   │   ├── subscriber.py          ← aio-pika consumer setup
@@ -164,9 +163,8 @@ woodpantry-ingestion/
 
 ## Outstanding Work
 
-- **Twilio webhook handler** — W-5 scope. Stub at `app/api/twilio.py`.
 - **Receipt photo/OCR flow** — Phase 3.
-- **Tests** — unit and integration tests to be added.
+- **Staging-complete notification durability** — phone/job tracking is in-memory, so restarts drop pending CONFIRM state.
 
 ## What to Avoid
 

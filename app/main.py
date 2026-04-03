@@ -5,9 +5,11 @@ import aio_pika
 import uvicorn
 from fastapi import FastAPI
 
+from app.api.twilio import router as twilio_router
 from app.config import settings
 from app.events.publisher import init_publisher
 from app.events.subscriber import start_consumer
+from app.workers.job_registry import job_registry
 from app.workers.pantry_ingest import handle_pantry_ingest_requested
 from app.workers.recipe_ingest import handle_recipe_import_requested
 
@@ -59,6 +61,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="woodpantry-ingestion", lifespan=lifespan)
+app.state.job_registry = job_registry
+app.include_router(twilio_router)
 
 
 @app.get("/healthz")
