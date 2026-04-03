@@ -62,9 +62,7 @@ class JobRegistry:
         return entry.phone
 
     def remove(self, phone: str) -> None:
-        job_ids = [
-            job_id for job_id, entry in self._jobs_by_id.items() if entry.phone == phone
-        ]
+        job_ids = [job_id for job_id, entry in self._jobs_by_id.items() if entry.phone == phone]
         for job_id in job_ids:
             self._jobs_by_id.pop(job_id, None)
 
@@ -74,9 +72,7 @@ class JobRegistry:
     def _prune_expired(self) -> None:
         now = time.time()
         expired_job_ids = [
-            job_id
-            for job_id, entry in self._jobs_by_id.items()
-            if now > entry.expires_at
+            job_id for job_id, entry in self._jobs_by_id.items() if now > entry.expires_at
         ]
         for job_id in expired_job_ids:
             self._jobs_by_id.pop(job_id, None)
