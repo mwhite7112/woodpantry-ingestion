@@ -25,5 +25,13 @@ class Settings(BaseSettings):
 
     model_config = {"env_prefix": ""}
 
+    @property
+    def twilio_signature_validation_enabled(self) -> bool:
+        return bool(self.twilio_auth_token)
+
+    @property
+    def twilio_outbound_enabled(self) -> bool:
+        return bool(self.twilio_account_sid and self.twilio_auth_token and self.twilio_from_number)
+
 
 settings = Settings()

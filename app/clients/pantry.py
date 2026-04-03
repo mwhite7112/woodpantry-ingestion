@@ -55,3 +55,14 @@ async def stage_items(
         staged_count=data["staged_count"],
         needs_review_count=data["needs_review_count"],
     )
+
+
+async def confirm_job(job_id: str) -> None:
+    """Confirm a staged pantry ingest job."""
+    async with httpx.AsyncClient(base_url=settings.pantry_url) as client:
+        resp = await client.post(
+            f"/pantry/ingest/{job_id}/confirm",
+            json={},
+            timeout=30.0,
+        )
+        resp.raise_for_status()

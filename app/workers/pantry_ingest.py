@@ -12,10 +12,12 @@ import logging
 
 import aio_pika
 
+from app.api.twilio import _build_stage_complete_message, send_outbound_sms
 from app.clients.dictionary import resolve
 from app.clients.pantry import stage_items
 from app.events.publisher import publish_pantry_ingest_failed
 from app.llm.openai import extract_pantry
+from app.workers.job_registry import job_registry
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,7 @@ async def handle_pantry_ingest_requested(
 
         try:
             raw_text = body["raw_text"]
+            from_number = body.get("from_number")
             extracted = await extract_pantry(raw_text)
 
             logger.info(
@@ -68,6 +71,22 @@ async def handle_pantry_ingest_requested(
                 stage_result.staged_count,
                 stage_result.needs_review_count,
             )
+            if from_number:
+                job_registry.mark_ready(job_id)
+                try:
+                    await send_outbound_sms(
+                        from_number,
+                        _build_stage_complete_message(
+                            stage_result.staged_count,
+                            stage_result.needs_review_count,
+                        ),
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to send Twilio stage-complete SMS for job %s",
+                        job_id,
+                        exc_info=True,
+                    )
 
         except Exception:
             logger.exception("Pantry ingest failed for job %s", job_id)

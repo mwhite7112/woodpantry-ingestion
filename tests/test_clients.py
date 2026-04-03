@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from app.clients.dictionary import ResolveResult, resolve
-from app.clients.pantry import StageResult, stage_items
+from app.clients.pantry import StageResult, confirm_job, stage_items
 from app.prompts.pantry import ExtractedItem
 
 
@@ -127,3 +127,28 @@ class TestPantryClient:
             pytest.raises(httpx.HTTPStatusError),
         ):
             await stage_items("job-bad", items, {0: None})
+
+    async def test_confirm_job_success(self):
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=_mock_response({}))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.clients.pantry.httpx.AsyncClient", return_value=mock_client):
+            await confirm_job("job-123")
+
+        call_args = mock_client.post.call_args
+        assert "/pantry/ingest/job-123/confirm" in call_args.args[0]
+        assert call_args.kwargs["json"] == {}
+
+    async def test_confirm_job_http_error(self):
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=_mock_response(status_code=422))
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with (
+            patch("app.clients.pantry.httpx.AsyncClient", return_value=mock_client),
+            pytest.raises(httpx.HTTPStatusError),
+        ):
+            await confirm_job("job-bad")

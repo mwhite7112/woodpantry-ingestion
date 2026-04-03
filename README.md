@@ -50,9 +50,16 @@ All other processing is queue-driven.
 | `EXTRACT_MODEL` | `gpt-5-mini` | OpenAI model for text extraction |
 | `VISION_MODEL` | `gpt-5` | OpenAI model for receipt OCR / vision (Phase 3) |
 | `TWILIO_ACCOUNT_SID` | optional | Twilio credentials (W-5) |
-| `TWILIO_AUTH_TOKEN` | optional | Also used to validate webhook signatures (W-5) |
-| `TWILIO_FROM_NUMBER` | optional | Outbound SMS number (W-5) |
+| `TWILIO_AUTH_TOKEN` | optional | Also used to validate `/twilio/inbound` request signatures |
+| `TWILIO_FROM_NUMBER` | optional | Outbound SMS number for staged and confirm replies |
 | `LOG_LEVEL` | `info` | Log level |
+
+Twilio-specific notes:
+
+- `/twilio/inbound` requires `TWILIO_AUTH_TOKEN` so the service can reject invalid `X-Twilio-Signature` headers.
+- Outbound staged and confirm reply SMS messages require all of `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER`.
+- New text messages publish `pantry.ingest.requested` with `job_id`, `raw_text`, and `from_number`.
+- `CONFIRM` replies call `POST /pantry/ingest/{job_id}/confirm` for the most recent staged pending job tracked for that phone number.
 
 ## Development
 
@@ -70,8 +77,14 @@ uv run ruff check app/
 uv run pytest
 ```
 
+## Twilio SMS Flow
+
+1. Twilio sends `POST /twilio/inbound`.
+2. The webhook validates the Twilio signature, reads `From` and `Body`, and creates a pantry ingest job for normal text messages.
+3. The webhook publishes `pantry.ingest.requested { job_id, raw_text, from_number }`.
+4. After pantry staging completes, the worker sends an outbound SMS with staged counts and `CONFIRM` instructions.
+5. A `CONFIRM` reply confirms the most recent pending staged pantry job for that phone number and sends a completion SMS.
+
 ## Outstanding Work
 
-- **Twilio webhook handler** — W-5 scope
 - **Receipt photo/OCR flow** — Phase 3
-- **Tests** — unit and integration tests to be added
